@@ -123,3 +123,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+
+## to big files
+revovet_HH_vask_initial_model_epoch_9.pt
