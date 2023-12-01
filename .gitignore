@@ -97,6 +97,7 @@ celerybeat-schedule
 *.sage.py
 
 # Environments
+MASKRCNN_Detection
 .env
 .venv
 env/
