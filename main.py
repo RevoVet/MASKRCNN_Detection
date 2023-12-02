@@ -1,13 +1,18 @@
 from fastapi import FastAPI, UploadFile, File
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import io
 import torch
 from torchvision.utils import draw_bounding_boxes, draw_segmentation_masks
 from torchvision.transforms import functional as F
+import numpy as np
+import base64
+
+
 
 
 app = FastAPI()
 
+label_dict = {1:"Vaskularisation"}
 
 def load_model():
     # placeholder function
@@ -23,6 +28,7 @@ def preprocess_image(image_file):
     image = Image.open(io.BytesIO(image_file)).convert("RGB")
     # Convert to tensor
     image = F.to_tensor(image)
+
     return image
 
 
@@ -30,6 +36,34 @@ def predict(image, model):
     with torch.no_grad():
         prediction = model([image])
     return prediction
+
+
+
+def annotate_image(image, predictions):
+    # Convert tensor image back to PIL for annotation
+    #image_pil = F.to_pil_image(image)
+    image_uint8 = (image * 255).byte()
+
+    boxes = predictions[0]['boxes']
+    labels = predictions[0]['labels']
+    scores = predictions[0]['scores']
+    masks = predictions[0]['masks'] > 0.5  # Masks are assumed to be in the predictions
+
+
+    print(image.dtype)
+    image_with_boxes = draw_bounding_boxes(image_uint8, boxes, colors="red")
+    image_with_masks = draw_segmentation_masks(image_with_boxes, masks.max(dim=0)[0], alpha=0.5)
+
+
+    annotated_image = F.to_pil_image(image_with_masks)
+
+    draw = ImageDraw.Draw(annotated_image)
+    for box, label, score in zip(boxes, labels, scores):
+        # Optionally, add labels and scores as text
+        print(label.dtype)
+        draw.text((box[0], box[1]), f'Label: {label_dict[label.item()]}, Score: {score:.2f}', fill="white")
+
+    return annotated_image
 
 
 
@@ -45,18 +79,17 @@ async def upload_image(file: UploadFile = File(...)):
     # Get predictions
     predictions = predict(image, model)
 
-    # Process predictions (for demonstration, just returning the first prediction)
-    if predictions:
-        # Extracting information from the first detected object for simplicity
-        result = {
-            "boxes": predictions[0]['boxes'].tolist(),
-            "labels": predictions[0]['labels'].tolist(),
-            "scores": predictions[0]['scores'].tolist(),
-        }
-    else:
-        result = {"message": "No objects detected"}
+    annotated_image = annotate_image(image, predictions)
 
-    return result
+    # Save the annotated image to a bytes buffer
+    img_byte_arr = io.BytesIO()
+    annotated_image.save(img_byte_arr, format='JPEG')
+    img_byte_arr = img_byte_arr.getvalue()
+
+    # Convert to base64 for easy transfer over HTTP
+    encoded_img = base64.b64encode(img_byte_arr).decode('utf-8')
+
+    return {"filename": file.filename, "annotated_image": encoded_img}
 
 
 print("I am working dude")
