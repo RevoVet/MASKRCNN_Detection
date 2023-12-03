@@ -12,11 +12,13 @@ import base64
 
 app = FastAPI()
 
-label_dict = {1:"Vaskularisation"}
+# label_dict = {1:"Vaskularisation"}
+label_dict = {i+1:name for i, name in enumerate(["Linsentruebung", "Vorderkammertruebung", "Vaskularisation", "Hornhauttruebung", "Hornhautpigmentierung", "Hornhautdefekt"])}
+
 
 def load_model():
     # placeholder function
-    model = torch.load("revovet_HH_vask_initial_model_epoch_9.pt", map_location=torch.device("cpu"))
+    model = torch.load("revovet_general_initial_model_epoch_9.pt", map_location=torch.device("cpu"))
     model.eval()
     return model
 
@@ -44,15 +46,14 @@ def annotate_image(image, predictions):
     #image_pil = F.to_pil_image(image)
     image_uint8 = (image * 255).byte()
 
-    boxes = predictions[0]['boxes']
-    labels = predictions[0]['labels']
-    scores = predictions[0]['scores']
-    masks = predictions[0]['masks'] > 0.5  # Masks are assumed to be in the predictions
+    scores = [score for score in predictions[0]['scores'] if score > 0.5]
+    boxes = predictions[0]['boxes'][0:len(scores)]
+    labels = predictions[0]['labels'][0:len(scores)]
+    masks = predictions[0]['masks'][0:len(scores)] > 0.5  # Masks are assumed to be in the predictions
 
 
-    print(image.dtype)
     image_with_boxes = draw_bounding_boxes(image_uint8, boxes, colors="red")
-    image_with_masks = draw_segmentation_masks(image_with_boxes, masks.max(dim=0)[0], alpha=0.5)
+    image_with_masks = draw_segmentation_masks(image_with_boxes, masks.max(dim=0)[0], alpha=0.7)
 
 
     annotated_image = F.to_pil_image(image_with_masks)
@@ -60,7 +61,6 @@ def annotate_image(image, predictions):
     draw = ImageDraw.Draw(annotated_image)
     for box, label, score in zip(boxes, labels, scores):
         # Optionally, add labels and scores as text
-        print(label.dtype)
         draw.text((box[0], box[1]), f'Label: {label_dict[label.item()]}, Score: {score:.2f}', fill="white")
 
     return annotated_image
