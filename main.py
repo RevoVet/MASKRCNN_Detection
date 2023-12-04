@@ -93,8 +93,6 @@ def generate_diagnostic_text(detections):
 
 
 
-
-
 def annotate_image(image, predictions):
     # Convert tensor image back to PIL for annotation
     #image_pil = F.to_pil_image(image)
@@ -123,13 +121,6 @@ def annotate_image(image, predictions):
 
 
     return annotated_image, detections
-
-
-#
-# detections.append({
-#             "label": label.item(),  # Convert to Python scalar
-#             "score": round(score.item(), 2)  # Convert to Python scalar and round off
-#         })
 
 
 
