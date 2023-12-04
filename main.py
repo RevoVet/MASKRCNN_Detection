@@ -6,8 +6,14 @@ from torchvision.utils import draw_bounding_boxes, draw_segmentation_masks
 from torchvision.transforms import functional as F
 import numpy as np
 import base64
+import openai
+import os
+
+from dotenv import load_dotenv
+load_dotenv()  # This loads the environment variables from .env
 
 
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
 app = FastAPI()
@@ -41,6 +47,54 @@ def predict(image, model):
 
 
 
+def preprocess_detections(detections):
+    # Group by labels and keep the one with the highest score for each label
+    max_score_per_label = {}
+
+    for detection in detections:
+        label = detection['label']
+        score = detection['score']
+
+        if label not in max_score_per_label or max_score_per_label[label]['score'] < score:
+            max_score_per_label[label] = detection
+
+    # Convert back to list and sort by score
+    processed_detections = sorted(max_score_per_label.values(), key=lambda x: x['score'], reverse=True)
+
+    return processed_detections
+
+
+
+def generate_diagnostic_text(detections):
+    # print(detections)
+    detections = preprocess_detections(detections)
+    print(detections)
+
+    if not detections:
+        prompt = "The pet's eye seems healthy with no detected issues. What general advice would you give to the pet owner for maintaining their pet's eye health?"
+    else:
+        prompt = "Based on the following pet eye diagnoses and their probabilities, provide a detailed diagnosis, explanation, and recommended next steps for each:\n"
+        for det in detections:
+            confidence_level = "highly likely" if det['score'] > 0.8 else "possibly"
+            prompt += f"- Diagnosis: {label_dict[det['label']]} (Probability: {det['score']:.2f}, Confidence: {confidence_level})\n"
+            #prompt += f"Possible treatment of {label_dict[det['label']]} and the chance of full recovery: \n"
+
+    #prompt += "\nProvide a concluding sentence with general advice for the pet owner. "
+
+    prompt += "\nProvide this text in German."
+
+    response = openai.Completion.create(
+        engine="text-davinci-003",  # Or other suitable engine
+        prompt=prompt,
+        max_tokens=450  # Adjust as needed
+    )
+
+    return response.choices[0].text.strip()
+
+
+
+
+
 def annotate_image(image, predictions):
     # Convert tensor image back to PIL for annotation
     #image_pil = F.to_pil_image(image)
@@ -53,17 +107,29 @@ def annotate_image(image, predictions):
 
 
     image_with_boxes = draw_bounding_boxes(image_uint8, boxes, colors="red")
-    image_with_masks = draw_segmentation_masks(image_with_boxes, masks.max(dim=0)[0], alpha=0.7)
+    image_with_masks = draw_segmentation_masks(image_with_boxes, masks.max(dim=0)[0])
 
 
     annotated_image = F.to_pil_image(image_with_masks)
-
+    detections = []
     draw = ImageDraw.Draw(annotated_image)
     for box, label, score in zip(boxes, labels, scores):
         # Optionally, add labels and scores as text
         draw.text((box[0], box[1]), f'Label: {label_dict[label.item()]}, Score: {score:.2f}', fill="white")
+        detections.append({
+            "label": label.item(),  # Convert to Python scalar
+            "score": round(score.item(), 2)  # Convert to Python scalar and round off
+        })
 
-    return annotated_image
+
+    return annotated_image, detections
+
+
+#
+# detections.append({
+#             "label": label.item(),  # Convert to Python scalar
+#             "score": round(score.item(), 2)  # Convert to Python scalar and round off
+#         })
 
 
 
@@ -79,7 +145,12 @@ async def upload_image(file: UploadFile = File(...)):
     # Get predictions
     predictions = predict(image, model)
 
-    annotated_image = annotate_image(image, predictions)
+    annotated_image, detections = annotate_image(image, predictions)
+
+    # Preprocess the detections
+    # print(preprocess_detections(detections))
+
+    diagnostic_text = generate_diagnostic_text(detections)
 
     # Save the annotated image to a bytes buffer
     img_byte_arr = io.BytesIO()
@@ -89,7 +160,10 @@ async def upload_image(file: UploadFile = File(...)):
     # Convert to base64 for easy transfer over HTTP
     encoded_img = base64.b64encode(img_byte_arr).decode('utf-8')
 
-    return {"filename": file.filename, "annotated_image": encoded_img}
+    return {"filename": file.filename, 
+            "annotated_image": encoded_img,
+            "detections": detections, 
+            "diagnostic_text": diagnostic_text}
 
 
 print("I am working dude")
