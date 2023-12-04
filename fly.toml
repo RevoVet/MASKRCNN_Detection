@@ -1,4 +1,4 @@
-# fly.toml app configuration file generated for maskrcnn-detection on 2023-12-02T12:53:34+01:00
+# fly.toml app configuration file generated for maskrcnn-detection on 2023-12-04T10:14:50+01:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
@@ -7,10 +7,6 @@ app = "maskrcnn-detection"
 primary_region = "ams"
 
 [build]
-  builder = "paketobuildpacks/builder:base"
-
-[env]
-  PORT = "8080"
 
 [http_service]
   internal_port = 8080
@@ -23,4 +19,4 @@ primary_region = "ams"
 [[vm]]
   cpu_kind = "shared"
   cpus = 2
-  memory_mb = 2028
+  memory_mb = 2048
