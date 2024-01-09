@@ -1,4 +1,5 @@
 from fastapi import FastAPI, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image, ImageDraw, ImageFont
 import io
 import torch
@@ -17,6 +18,11 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+)
 
 # label_dict = {1:"Vaskularisation"}
 label_dict = {i+1:name for i, name in enumerate(["Linsentruebung", "Vorderkammertruebung", "Vaskularisation", "Hornhauttruebung", "Hornhautpigmentierung", "Hornhautdefekt"])}
