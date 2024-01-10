@@ -21,7 +21,10 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
 )
 
 # label_dict = {1:"Vaskularisation"}
@@ -90,7 +93,7 @@ def generate_diagnostic_text(detections):
     prompt += "\nProvide this text in German."
 
     response = openai.Completion.create(
-        engine="text-davinci-003",  # Or other suitable engine
+        engine="gpt-3.5-turbo-instruct",  # Or other suitable engine
         prompt=prompt,
         max_tokens=450  # Adjust as needed
     )
