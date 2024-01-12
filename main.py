@@ -1,5 +1,6 @@
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from PIL import Image, ImageDraw, ImageFont
 import io
 import torch
@@ -38,6 +39,7 @@ def load_model():
     return model
 
 model = load_model()
+
 
 
 def preprocess_image(image_file):
@@ -106,8 +108,10 @@ def annotate_image(image, predictions):
     # Convert tensor image back to PIL for annotation
     #image_pil = F.to_pil_image(image)
     image_uint8 = (image * 255).byte()
-
     scores = [score for score in predictions[0]['scores'] if score > 0.5]
+    if len(scores) == 0:
+        return F.to_pil_image(image_uint8), [{"label": 0, "score":0.0}]
+    
     boxes = predictions[0]['boxes'][0:len(scores)]
     labels = predictions[0]['labels'][0:len(scores)]
     masks = predictions[0]['masks'][0:len(scores)] > 0.5  # Masks are assumed to be in the predictions
@@ -132,19 +136,51 @@ def annotate_image(image, predictions):
     return annotated_image, detections
 
 
+# @app.post("/test-upload/")
+# async def test_upload(file: UploadFile = File(...)):
+#     # Read image file
+#     image_contents = await file.read()
+#     # Preprocess the image
+#     image = preprocess_image(image_contents)
+#     # Get predictions
+#     predictions = predict(image, model)
+#     annotated_image, detections = annotate_image(image, predictions)
+#     diagnostic_text = generate_diagnostic_text(detections)
+
+#     img_byte_arr = io.BytesIO()
+#     annotated_image.save(img_byte_arr, format='JPEG')
+#     img_byte_arr = img_byte_arr.getvalue()
+
+#     # Convert to base64 for easy transfer over HTTP
+#     encoded_img = base64.b64encode(img_byte_arr).decode('utf-8')
+
+#     print("Diagnose successful")
+#     return {"filename": file.filename, "message": "Test upload successful"}
+
+
+@app.get("/", response_class=HTMLResponse)
+async def root():
+    table = "<table><tr><th>Index</th><th>Label</th></tr>"
+    for index, label in label_dict.items():
+        table += f"<tr><td>{index}</td><td>{label}</td></tr>"
+    table += "</table>"
+    return f"""
+        <h1>Hello Martin!</h1>
+        <p>This is the Revovet API</p>
+        <p>Check out the documentation under /docs </p>
+        <p>The label encoding is as follows: </p>
+        {table}
+    """
 
 
 @app.post("/upload-image/")
 async def upload_image(file: UploadFile = File(...)):
     # Read image file
     image_contents = await file.read()
-    
     # Preprocess the image
     image = preprocess_image(image_contents)
-
     # Get predictions
     predictions = predict(image, model)
-
     annotated_image, detections = annotate_image(image, predictions)
 
     # Preprocess the detections
