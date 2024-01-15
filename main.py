@@ -1,6 +1,7 @@
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
 from PIL import Image, ImageDraw, ImageFont
 import io
 import torch
@@ -13,6 +14,9 @@ import os
 
 from dotenv import load_dotenv
 load_dotenv()  # This loads the environment variables from .env
+
+class ImageData(BaseModel):
+    base64_image: str
 
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -174,11 +178,13 @@ async def root():
 
 
 @app.post("/upload-image/")
-async def upload_image(file: UploadFile = File(...)):
+async def upload_image(image_data: ImageData):
+    print("Received image")
+    base64_image = image_data.base64_image
     # Read image file
-    image_contents = await file.read()
+    # base64.b64decode(base64_image)
     # Preprocess the image
-    image = preprocess_image(image_contents)
+    image = preprocess_image(base64.b64decode(base64_image))
     # Get predictions
     predictions = predict(image, model)
     annotated_image, detections = annotate_image(image, predictions)
@@ -196,8 +202,7 @@ async def upload_image(file: UploadFile = File(...)):
     # Convert to base64 for easy transfer over HTTP
     encoded_img = base64.b64encode(img_byte_arr).decode('utf-8')
 
-    return {"filename": file.filename, 
-            "annotated_image": encoded_img,
+    return {"annotated_image": encoded_img,
             "detections": detections, 
             "diagnostic_text": diagnostic_text}
 
