@@ -33,7 +33,7 @@ app.add_middleware(
 )
 
 # label_dict = {1:"Vaskularisation"}
-label_dict = {i+1:name for i, name in enumerate(["Linsentruebung", "Vorderkammertruebung", "Vaskularisation", "Hornhauttruebung", "Hornhautpigmentierung", "Hornhautdefekt"])}
+label_dict = {i:name for i, name in enumerate(["Kein Befund", "Linsentruebung", "Vorderkammertruebung", "Vaskularisation", "Hornhauttruebung", "Hornhautpigmentierung", "Hornhautdefekt"])}
 
 
 def load_model():
